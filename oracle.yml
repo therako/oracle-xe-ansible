@@ -1,0 +1,97 @@
+---
+- hosts: all
+  sudo: yes
+  tasks:
+    - name: clearing yum repo
+      command: yum clean all
+
+    - name: install libselinux-python for selinux
+      yum: name=libselinux-python state=present
+
+    - name: make sure the language is english
+      copy: src=./files/i18n dest=/etc/sysconfig/
+
+    - name: disable selinux
+      selinux: state=disabled
+
+    - name: install unzip
+      yum: name=unzip state=present
+
+    - name: install oracle dependencies
+      yum: name=libaio state=present
+
+    - name: check if swap is increased
+      stat: path=/swapfile
+      register: swapfile
+
+    - name: create the file to increase the swap space for oracle-xe
+      command: dd if=/dev/zero of=/swapfile bs=1024 count=2048k
+      when: not swapfile.stat.exists
+
+    - name: increase the swap space for oracle-xe
+      command: mkswap /swapfile
+      when: not swapfile.stat.exists
+
+    - name: activate the increase the swap space for oracle-xe
+      command: swapon /swapfile
+      when: not swapfile.stat.exists
+
+    - name: create the dba group
+      group: name=dba state=present
+
+    - name: create oracle user
+      user: name=oracle group=dba home=/home/oracle move_home=no state=present
+
+    - name: check if oracle is installed
+      stat: path=/u01/app/oracle/product/11.2.0/xe
+      register: oracle_installed_path
+
+    - name: unzip the oracle installer
+      unarchive: src=./oracle-xe-11.2.0-1.0.x86_64.rpm.zip dest=/tmp
+      when: not oracle_installed_path.stat.exists
+
+    - name: install oracle-xe
+      shell: ORACLE_HOME=/u01/app/oracle/product/11.2.0/xe rpm -ivh /tmp/Disk1/oracle-xe-11.2.0-1.0.x86_64.rpm
+      when: not oracle_installed_path.stat.exists
+
+    - name: copy over the bash profile
+      copy: src=./files/bash_profile dest=/home/oracle/.bash_profile group=dba owner=oracle
+
+    - name: copy config file
+      copy: src={{ item.src }} dest={{ item.dst }} owner=root group=root mode=0644
+      with_items:
+        - { src: './files/xe.rsp', dst: '/tmp/xe.rsp' }
+        - { src: './files/set_listener.sql', dst: '/tmp/set_listener.sql' }
+
+    - name: copy spfileXE.ora
+      copy: >
+        src=./files/spfileXE.ora
+        dest=/u01/app/oracle/product/11.2.0/xe/dbs/spfileXE.ora
+        owner=oracle
+        group=dba
+        mode=0600
+
+    - name: check if oracle is configured
+      stat: path=/u01/app/oracle/product/11.2.0/xe/donot_delete
+      register: oracle_configured
+
+    - name: Configure oracle xe
+      command: /etc/init.d/oracle-xe configure responseFile=/tmp/xe.rsp
+      when: not oracle_configured.stat.exists
+
+    - name: setup oracle environment
+      shell: /bin/echo 'source /u01/app/oracle/product/11.2.0/xe/bin/oracle_env.sh' >> /etc/bashrc
+      when: not oracle_configured.stat.exists
+
+    - name: set oracle listener
+      shell: ORACLE_HOME=/u01/app/oracle/product/11.2.0/xe /u01/app/oracle/product/11.2.0/xe/bin/sqlplus system/manager@localhost < /tmp/set_listener.sql
+      when: not oracle_configured.stat.exists
+
+    - name: create oracle admin folder
+      file: path=/home/oracle/oradmin/backup owner=oracle group=dba state=directory
+
+    - name: touch a file to mark the end of oracle configuration
+      file: path=/u01/app/oracle/product/11.2.0/xe/donot_delete state=touch
+
+    - name: ensure that oracle-xe is running
+      service: name=oracle-xe state=started

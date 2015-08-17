@@ -1,0 +1,17 @@
+*.audit_file_dest='/u01/app/oracle/admin/XE/adump'
+*.compatible='11.2.0.0.0'
+*.control_files='/u01/app/oracle/oradata/XE/control.dbf'
+*.db_name='XE'
+*.DB_RECOVERY_FILE_DEST='/u01/app/oracle/fast_recovery_area'
+*.DB_RECOVERY_FILE_DEST_SIZE=10G
+*.diagnostic_CC"~dest='/u01/app/oracle'
+*.job_queue_processes=4
+*.local_listener='(ADDRESS=(PROTOCOL=TCP)(HOST=oracle-host)(PORT=1521))'
+*.memory_target=1073741824
+*.open_cursors=300
+*.remote_login_passwordfile='EXCLUSIVE'
+*.sessions=20
+*.shared_servers=4
+*.undo_management='AUTO'
+*.undo_tablespace='UNDOTBS1'
+CC"GeCC"FeC
